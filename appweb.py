@@ -45,7 +45,7 @@ def card(titulo, valor):
 
 # ---------- TITULO PRINCIPAL ----------
 st.markdown("""
-<h1 style='color:#4da3ff; margin-bottom: 0;'>DISEÑO A FLEXIÓN DE VIGAS - SIMPLEMENTE Y DOBLEMENTE REFORZADAS</h1>
+<h1 style='color:#4da3ff; margin-bottom: 0;'>DISEÑO A FLEXIÓN DE VIGAS - SIN Y CON ACERO A COMPRESION</h1>
 """, unsafe_allow_html=True)
 
 # ---------- SIDEBAR ----------
@@ -2367,13 +2367,13 @@ def mostrar_verificacion(
 
             with col_req1:
                 card(
-                    "Mu₁",
+                    "φMn₁",
                     f"{resultado_doble_control['phiMn1_val']:.2f} ton·m"
                 )
 
             with col_req2:
                 card(
-                    "Mu₂",
+                    "Mu₂ residual",
                     f"{resultado_doble_control['Mu2_val']:.2f} ton·m"
                 )
 
@@ -2547,11 +2547,11 @@ def mostrar_verificacion(
 
 
         # =====================================================
-        # 3. Diseño requerido — sección simplemente reforzada
+        # 3. EVALUACIÓN PRELIMINAR — SECCIÓN SIMPLEMENTE REFORZADA
         # =====================================================
 
         st.markdown(
-            "##### 3. Diseño requerido — sección simplemente reforzada"
+            "##### 3. Evaluación preliminar — sección simplemente reforzada"
         )
 
         resultado_simple = (
@@ -2568,8 +2568,14 @@ def mostrar_verificacion(
             )
         )
 
+        requiere_doble = resultado_simple.get(
+            "requiere_doble",
+            False
+        )
+
         st.write(
-            f"**Mu:** {Mu:.2f} ton·m"
+            f"**Momento solicitado:** "
+            f"{Mu:.2f} ton·m"
         )
 
         st.latex(
@@ -2582,8 +2588,17 @@ def mostrar_verificacion(
             f"= **{resultado_simple['Mn_req_val']:.2f} ton·m**"
         )
 
+        st.write(
+            f"**Peralte efectivo utilizado:** "
+            f"d = {resultado_simple['d']:.2f} cm"
+        )
+
+        # -----------------------------------------------------
+        # PARÁMETRO Ku
+        # -----------------------------------------------------
+
         st.latex(
-            r"K_u=\frac{M_n}{0.85f'_cbd^2}"
+            r"K_u=\frac{M_n^{req}}{0.85f'_cbd^2}"
         )
 
         st.write(
@@ -2591,15 +2606,68 @@ def mostrar_verificacion(
         )
 
         # -----------------------------------------------------
-        # RADICANDO
+        # ACERO BALANCEADO Y LÍMITE DE LA PRIMERA PARTE
+        # -----------------------------------------------------
+
+        st.write(
+            f"Acero balanceado = "
+            f"**{resultado_simple['As_bal_val']:.2f} cm²**"
+        )
+
+        st.write(
+            f"Acero máximo para la primera parte = "
+            f"0.75 As₍bal₎ = "
+            f"**{resultado_simple['As_max_val']:.2f} cm²**"
+        )
+
+        Ku_max = (
+            resultado_simple["As_max_val"] * fy
+            / (
+                0.85
+                * fc
+                * b
+                * resultado_simple["d"] ** 2
+            )
+        )
+
+        st.write(
+            f"Ku máximo asociado a 0.75 As₍bal₎ = "
+            f"**{Ku_max:.5f}**"
+        )
+
+        if resultado_simple["Ku_val"] <= Ku_max:
+
+            st.success(
+                f"✅ Ku = {resultado_simple['Ku_val']:.5f} "
+                f"≤ Ku máximo = {Ku_max:.5f}: "
+                "la solicitación puede resolverse como "
+                "sección simplemente reforzada."
+            )
+
+        else:
+
+            st.warning(
+                f"⚠️ Ku = {resultado_simple['Ku_val']:.5f} "
+                f"> Ku máximo = {Ku_max:.5f}: "
+                "la sección simplemente reforzada no es "
+                "suficiente bajo el límite de acero adoptado."
+            )
+
+        # -----------------------------------------------------
+        # INTENTO DE SOLUCIÓN SIMPLE
         # -----------------------------------------------------
 
         if resultado_simple.get("radicando_val") is not None:
 
             if resultado_simple["radicando_val"] >= 0:
 
+                st.markdown(
+                    "**Intento de solución simple "
+                    "(sin considerar todavía el límite de acero máximo)**"
+                )
+
                 st.latex(
-                    r"a=d-\sqrt{d^2-\frac{2M_n}{0.85f'_cb}}"
+                    r"a=d-\sqrt{d^2-\frac{2M_n^{req}}{0.85f'_cb}}"
                 )
 
                 st.write(
@@ -2612,7 +2680,7 @@ def mostrar_verificacion(
                 )
 
                 st.latex(
-                r"c=\frac{a}{\beta_1}"
+                    r"c=\frac{a}{\beta_1}"
                 )
 
                 st.write(
@@ -2622,42 +2690,62 @@ def mostrar_verificacion(
                 )
 
                 st.latex(
-                r"\varepsilon_s=\varepsilon_{cu}\frac{d-c}{c}"
+                    r"\varepsilon_s=\varepsilon_{cu}\frac{d-c}{c}"
                 )
 
-            st.write(
-                f"εs = {ecu:.6f} × "
-                f"({resultado_simple['d']:.2f} - "
-                f"{resultado_simple['c_val']:.2f}) / "
-                f"{resultado_simple['c_val']:.2f} "
-                f"= **{resultado_simple['eps_s']:.6f}**"
-            )
-
+                st.write(
+                    f"εs = {ecu:.6f} × "
+                    f"({resultado_simple['d']:.2f} - "
+                    f"{resultado_simple['c_val']:.2f}) / "
+                    f"{resultado_simple['c_val']:.2f} "
+                    f"= **{resultado_simple['eps_s']:.6f}**"
+                )
 
         # -----------------------------------------------------
-        # ACERO REQUERIDO
+        # ACERO QUE NECESITARÍA LA SOLUCIÓN SIMPLE
         # -----------------------------------------------------
 
         if resultado_simple.get("As_flexion_val") is not None:
 
             st.latex(
-                r"A_s=\frac{M_u}{\phi f_y(d-a/2)}"
+                r"A_s^{simple}=\frac{M_u}{\phi f_y(d-a/2)}"
             )
 
             st.write(
-                f"As por flexión = "
+                f"Acero requerido si se resolviera "
+                f"como sección simplemente reforzada = "
                 f"**{resultado_simple['As_flexion_val']:.2f} cm²**"
             )
 
             st.write(
-                f"As mínimo = "
+                f"Acero mínimo = "
                 f"**{resultado_simple['As_min_val']:.2f} cm²**"
             )
 
-            st.write(
-                f"As de diseño = "
-                f"max(As flexión, As mínimo) "
-                f"= **{resultado_simple['As_diseno_val']:.2f} cm²**"
+            if requiere_doble:
+
+                st.write(
+                    f"Este acero requerido supera el límite "
+                    f"de la primera parte: "
+                    f"**{resultado_simple['As_max_val']:.2f} cm²**."
+                )
+
+            else:
+
+                st.write(
+                    f"As de diseño = "
+                    f"max(As simple, As mínimo) = "
+                    f"**{resultado_simple['As_diseno_val']:.2f} cm²**"
+                )
+
+        # -----------------------------------------------------
+        # CAPACIDAD DE LA SOLUCIÓN SIMPLE
+        # -----------------------------------------------------
+
+        if not requiere_doble:
+
+            st.markdown(
+                "**Capacidad de la sección simplemente reforzada**"
             )
 
             st.latex(
@@ -2665,42 +2753,18 @@ def mostrar_verificacion(
             )
 
             st.write(
-                f"**Mn requerido = "
-                f"{resultado_simple['Mn_calculado_val']:.2f} ton·m**"
+                f"Mn = "
+                f"**{resultado_simple['Mn_calculado_val']:.2f} ton·m**"
             )
 
             st.latex(
-                r"\phi M_n^{req}=\phi\cdot M_n^{req}"
+                r"\phi M_n=\phi\cdot M_n"
             )
 
             st.write(
-                f"φMn objetivo = {phiFlexion:.2f} × "
+                f"φMn = {phiFlexion:.2f} × "
                 f"{resultado_simple['Mn_calculado_val']:.2f} "
                 f"= **{resultado_simple['phiMn_calculado_val']:.2f} ton·m**"
-            )
-
-
-        # -----------------------------------------------------
-        # LÍMITES
-        # -----------------------------------------------------
-
-        st.markdown(
-            "**Control de sección simplemente reforzada**"
-        )
-
-        st.write(
-            f"As balanceado = "
-            f"**{resultado_simple['As_bal_val']:.2f} cm²**"
-        )
-
-        st.write(
-            f"As máximo = "
-            f"**{resultado_simple['As_max_val']:.2f} cm²**"
-        )
-
-        requiere_doble = resultado_simple.get(
-                "requiere_doble",
-                False
             )
 
     # =====================================================
@@ -2776,35 +2840,39 @@ def mostrar_verificacion(
             if resultado_doble["valido"]:
 
                 # -------------------------------------------------
-                # ACERO BALANCEADO
+                # PRIMERA PARTE — ACERO BALANCEADO
                 # -------------------------------------------------
+
+                st.markdown(
+                    "**Primera parte de la resistencia — "
+                    "sección simplemente reforzada limitada**"
+                )
 
                 st.latex(
                     r"A_{s1}=0.75A_{s,bal}"
                 )
 
                 st.write(
-                    f"As balanceado = "
+                    f"Acero balanceado = "
                     f"**{resultado_doble['As_bal_val']:.2f} cm²**"
                 )
 
                 st.write(
                     f"As₁ = 0.75 × "
-                    f"{resultado_doble['As_bal_val']:.2f}"
-                    f" = **{resultado_doble['As1_val']:.2f} cm²**"
+                    f"{resultado_doble['As_bal_val']:.2f} "
+                    f"= **{resultado_doble['As1_val']:.2f} cm²**"
                 )
 
                 # -------------------------------------------------
-                # PRIMERA PARTE DE LA RESISTENCIA
+                # BLOQUE DE COMPRESIÓN
                 # -------------------------------------------------
 
                 st.latex(
-                    r"M_{n1}=A_{s1}f_y\left(d-\frac{a_1}{2}\right)"
+                    r"a_1=\frac{A_{s1}f_y}{0.85f'_cb}"
                 )
 
                 st.write(
-                    f"a₁ = "
-                    f"**{resultado_doble['a1_val']:.2f} cm**"
+                    f"a₁ = **{resultado_doble['a1_val']:.2f} cm**"
                 )
 
                 st.latex(
@@ -2812,18 +2880,29 @@ def mostrar_verificacion(
                 )
 
                 st.write(
-                    f"c₁ = "
-                    f"**{resultado_doble['c1_val']:.2f} cm**"
+                    f"c₁ = **{resultado_doble['c1_val']:.2f} cm**"
+                )
+
+                # -------------------------------------------------
+                # CAPACIDAD DE LA PRIMERA PARTE
+                # -------------------------------------------------
+
+                st.latex(
+                    r"M_{n1}=A_{s1}f_y\left(d-\frac{a_1}{2}\right)"
                 )
 
                 st.write(
-                    f"Mn₁ = "
-                    f"**{resultado_doble['Mn1_val']:.2f} ton·m**"
+                    f"Mn₁ = **{resultado_doble['Mn1_val']:.2f} ton·m**"
+                )
+
+                st.latex(
+                    r"\phi M_{n1}=\phi\cdot M_{n1}"
                 )
 
                 st.write(
-                    f"φMn₁ = "
-                    f"**{resultado_doble['phiMn1_val']:.2f} ton·m**"
+                    f"φMn₁ = {phiFlexion:.2f} × "
+                    f"{resultado_doble['Mn1_val']:.2f} "
+                    f"= **{resultado_doble['phiMn1_val']:.2f} ton·m**"
                 )
 
                 # -------------------------------------------------
@@ -2831,13 +2910,14 @@ def mostrar_verificacion(
                 # -------------------------------------------------
 
                 st.markdown(
-                    "##### Momento residual Mu₂"
+                    "##### Momento residual — segunda contribución"
                 )
 
                 st.write(
-                    "Mu₂ es el momento que todavía "
-                    "debe ser resistido después de "
-                    "la primera parte de la resistencia."
+                    "La primera parte de la resistencia "
+                    "proporciona φMn₁. El momento que todavía "
+                    "debe resistirse mediante el par adicional "
+                    "acero de tracción–acero de compresión es Mu₂."
                 )
 
                 st.latex(
@@ -2854,21 +2934,52 @@ def mostrar_verificacion(
                 # ACERO ADICIONAL DE TRACCIÓN
                 # -------------------------------------------------
 
+                st.markdown(
+                    "**Acero adicional de tracción**"
+                )
+
                 st.latex(
-                    r"A_{s2}=\frac{M_{u2}}{\phi f_y(d-d')}"
+                    r"A_{s2}="
+                    r"\frac{M_{u2}}{\phi f_y(d-d')}"
                 )
 
                 st.write(
                     f"As₂ = "
-                    f"**{resultado_doble['As2_val']:.2f} cm²**"
+                    f"{resultado_doble['Mu2_val']:.2f} × 1000 × 100 "
+                    f"/ ["
+                    f"{phiFlexion:.2f} × "
+                    f"{fy:.2f} × ("
+                    f"{resultado_doble['d']:.2f} - "
+                    f"{resultado_doble['d_comp']:.2f}"
+                    f")]"
+                )
+
+                st.write(
+                    f"**As₂ = {resultado_doble['As2_val']:.2f} cm²**"
+                )
+
+                st.info(
+                    "As₂ corresponde únicamente al acero adicional "
+                    "de tracción necesario para resistir Mu₂. "
+                    "Este acero trabaja en pareja con el acero "
+                    "de compresión A's."
                 )
 
                 # -------------------------------------------------
                 # SEGUNDA PARTE DE LA RESISTENCIA
                 # -------------------------------------------------
 
-                Mn2 = resultado_doble["Mu2_val"] / phiFlexion
+                st.markdown(
+                    "**Segunda contribución de resistencia**"
+                )
+
+                Mn2 = (
+                    resultado_doble["Mu2_val"]
+                    / phiFlexion
+                )
+
                 phiMn2 = resultado_doble["Mu2_val"]
+
 
                 st.latex(
                     r"M_{n2}=\frac{M_{u2}}{\phi}"
@@ -2881,11 +2992,18 @@ def mostrar_verificacion(
                 )
 
                 st.latex(
-                    r"\phi M_{n2}=\phi\cdot M_{n2}"
+                    r"\phi M_{n2}=\phi\cdot M_{n2}=M_{u2}"
                 )
 
                 st.write(
-                    f"φMn₂ = **{phiMn2:.2f} ton·m**"
+                    f"φMn₂ = {phiFlexion:.2f} × "
+                    f"{Mn2:.2f} "
+                    f"= **{phiMn2:.2f} ton·m**"
+                )
+
+                st.info(
+                    "Por tratarse del diseño del refuerzo adicional, "
+                    "φMn₂ se determina para igualar el momento residual Mu₂."
                 )
 
                 # -------------------------------------------------
