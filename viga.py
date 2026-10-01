@@ -220,7 +220,7 @@ def propiedades_minimo_flexion(
     # 2. RESISTENCIA A TRACCIÓN POR FLEXIÓN DEL CONCRETO
     # =========================================================
 
-    fr = 0.62 * math.sqrt(fc)
+    fr = 2 * math.sqrt(fc)
 
     # =========================================================
     # 3. MOMENTO DE AGRIETAMIENTO
