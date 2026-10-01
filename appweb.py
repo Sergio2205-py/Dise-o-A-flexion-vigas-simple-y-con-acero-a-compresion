@@ -2495,7 +2495,7 @@ def mostrar_verificacion(
         )
 
         st.latex(
-            r"f_r=0.62\sqrt{f'_c}"
+            r"f_r=2\sqrt{f'_c}"
         )
 
         st.write(
